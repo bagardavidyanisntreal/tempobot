@@ -1,8 +1,10 @@
 package service
 
 import (
+	"context"
 	"database/sql"
 	"errors"
+	"fmt"
 
 	"github.com/bagardavidyanisntreal/tempobot/internal/model"
 	"github.com/bagardavidyanisntreal/tempobot/internal/storage"
@@ -17,20 +19,24 @@ func NewUserService(r *storage.UserRepo) *UserService {
 }
 
 func (s *UserService) EnsureUser(
+	ctx context.Context,
 	telegramID int64,
 	username string,
 	firstName string,
 ) (*model.User, error) {
-	u, err := s.repo.FindByTelegramID(telegramID)
+	u, err := s.repo.FindByTelegramID(ctx, telegramID)
 	if err == nil {
-		_ = s.repo.UpdateProfile(u.ID, username, firstName)
+		_ = s.repo.UpdateProfile(ctx, u.ID, username, firstName)
 
 		return u, nil
 	}
 
 	if errors.Is(err, sql.ErrNoRows) {
-		return s.repo.Create(telegramID, username, firstName)
+		u, err = s.repo.Create(ctx, telegramID, username, firstName)
+		if err != nil {
+			return nil, fmt.Errorf("create user: %w", err)
+		}
 	}
 
-	return nil, err
+	return u, nil
 }

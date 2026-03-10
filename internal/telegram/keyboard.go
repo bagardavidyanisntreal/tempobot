@@ -2,10 +2,10 @@ package telegram
 
 import "strconv"
 
-func InlineKeyboard(eventID int64, stats map[string]int) map[string]interface{} {
+func InlineKeyboard(eventID int64, stats map[string]int) map[string]any {
 	id := strconv.FormatInt(eventID, 10)
 
-	return map[string]interface{}{
+	return map[string]any{
 		"inline_keyboard": [][]map[string]string{
 			{
 				{

@@ -1,6 +1,10 @@
 package storage
 
-import "database/sql"
+import (
+	"context"
+	"database/sql"
+	"fmt"
+)
 
 type ParticipantRepo struct {
 	db *sql.DB
@@ -10,7 +14,7 @@ func NewParticipantRepo(db *sql.DB) *ParticipantRepo {
 	return &ParticipantRepo{db: db}
 }
 
-func (r *ParticipantRepo) Upsert(eventID, userID int64, status string) error {
+func (r *ParticipantRepo) Upsert(ctx context.Context, eventID, userID int64, status string) error {
 	query := `
 		INSERT INTO participants (event_id, user_id, status)
 		VALUES ($1,$2,$3)
@@ -20,23 +24,30 @@ func (r *ParticipantRepo) Upsert(eventID, userID int64, status string) error {
 		updated_at = now()
 	`
 
-	_, err := r.db.Exec(query, eventID, userID, status)
+	_, err := r.db.ExecContext(ctx, query, eventID, userID, status)
+	if err != nil {
+		return fmt.Errorf("upsert participant: %w", err)
+	}
 
-	return err
+	return nil
 }
 
-func (r *ParticipantRepo) CountByStatus(eventID int64) (map[string]int, error) {
-	rows, err := r.db.Query(`
+func (r *ParticipantRepo) CountByStatus(ctx context.Context, eventID int64) (map[string]int, error) {
+	rows, err := r.db.QueryContext(ctx, `
 		SELECT status, count(*)
 		FROM participants
 		WHERE event_id = $1
 		GROUP BY status
 	`, eventID)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("countByStatus participants: %w", err)
 	}
 
-	defer rows.Close()
+	if rows.Err() != nil {
+		return nil, fmt.Errorf("countByStatus participants: %w", rows.Err())
+	}
+
+	defer func() { _ = rows.Close() }()
 
 	stats := map[string]int{
 		"going": 0,
@@ -45,12 +56,13 @@ func (r *ParticipantRepo) CountByStatus(eventID int64) (map[string]int, error) {
 	}
 
 	for rows.Next() {
-
-		var status string
-		var count int
+		var (
+			status string
+			count  int
+		)
 
 		if err = rows.Scan(&status, &count); err != nil {
-			return nil, err
+			return nil, fmt.Errorf("countByStatus participants: %w", err)
 		}
 
 		stats[status] = count

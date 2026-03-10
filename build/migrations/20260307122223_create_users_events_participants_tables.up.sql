@@ -15,7 +15,7 @@ CREATE TABLE IF NOT EXISTS events
     title       TEXT,
     description TEXT,
     chat_id     BIGINT,
-    message_id  INT,
+    message_id  BIGINT,
     created_at  TIMESTAMP DEFAULT now()
 );
 
