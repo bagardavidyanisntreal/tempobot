@@ -2,4 +2,4 @@ module github.com/bagardavidyanisntreal/tempobot
 
 go 1.22
 
-require github.com/lib/pq v1.11.2
+require github.com/go-telegram-bot-api/telegram-bot-api/v5 v5.5.1
