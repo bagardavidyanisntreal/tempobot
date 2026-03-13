@@ -1,49 +1,67 @@
-//go:build !cgo
-
 package main
 
 import (
 	"log"
 	"os"
+	"strconv"
 
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 )
 
 func main() {
-	// Use an environment variable for the bot token
-	botToken := os.Getenv("API_TOKEN")
-	if botToken == "" {
-		log.Fatal("API_TOKEN environment variable not set")
-	}
-
-	bot, err := tgbotapi.NewBotAPI(botToken)
+	bot, err := tgbotapi.NewBotAPI(os.Getenv("BOT_TOKEN"))
 	if err != nil {
-		log.Panic(err)
+		log.Fatal("BOT_TOKEN not found")
 	}
 
-	bot.Debug = true // Enable debug output for development
-	log.Printf("Authorized on account %s", bot.Self.UserName)
+	var debug bool
 
-	// Configure updates: use long polling
-	u := tgbotapi.NewUpdate(0)
-	u.Timeout = 60
+	debug, err = strconv.ParseBool(os.Getenv("DEBUG"))
+	if err != nil {
+		log.Fatalf("failed get DEBUG cfg: %s", err)
+	}
 
-	updates := bot.GetUpdatesChan(u)
+	bot.Debug = debug
 
-	// Loop through updates and echo messages
+	// Create a new UpdateConfig struct with an offset of 0. Offsets are used
+	// to make sure Telegram knows we've handled previous values and we don't
+	// need them repeated.
+	updateConfig := tgbotapi.NewUpdate(0)
+
+	// Tell Telegram we should wait up to 30 seconds on each request for an
+	// update. This way we can get information just as quickly as making many
+	// frequent requests without having to send nearly as many.
+	updateConfig.Timeout = 30
+
+	// Start polling Telegram for updates.
+	updates := bot.GetUpdatesChan(updateConfig)
+
+	// Let's go through each update that we're getting from Telegram.
 	for update := range updates {
-		if update.Message != nil { // Ignore non-message updates
-			log.Printf("[%s] %s", update.Message.From.UserName, update.Message.Text)
+		// Telegram can send many types of updates depending on what your Bot
+		// is up to. We only want to look at messages for now, so we can
+		// discard any other updates.
+		if update.Message == nil {
+			continue
+		}
 
-			// Create a new message configuration
-			msg := tgbotapi.NewMessage(update.Message.Chat.ID, update.Message.Text)
-			// Optionally, reply to the specific message
-			msg.ReplyToMessageID = update.Message.MessageID
+		// Now that we know we've gotten a new message, we can construct a
+		// reply! We'll take the Chat ID and Text from the incoming message
+		// and use it to create a new message.
+		msg := tgbotapi.NewMessage(update.Message.Chat.ID, update.Message.Text+", пидор")
 
-			// Send the echo message
-			if _, err := bot.Send(msg); err != nil {
-				log.Println("Error sending message:", err)
-			}
+		// We'll also say that this message is a reply to the previous message.
+		// For any other specifications than Chat ID or Text, you'll need to
+		// set fields on the `MessageConfig`.
+		msg.ReplyToMessageID = update.Message.MessageID
+
+		// Okay, we're sending our message off! We don't care about the message
+		// we just sent, so we'll discard it.
+		if _, err = bot.Send(msg); err != nil {
+			// Note that panics are a bad way to handle errors. Telegram can
+			// have service outages or network errors, you should retry sending
+			// messages or more gracefully handle failures.
+			log.Printf("sending msg error: %s", err)
 		}
 	}
 }
