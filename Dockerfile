@@ -8,7 +8,7 @@ WORKDIR /app
 COPY . .
 
 # Собираем бинарник
-RUN CGO_ENABLED=0 go build -o /bot cmd/main.go
+RUN CGO_ENABLED=0 go build -o /bot main.go
 
 # Убираем лишнее
 RUN apk add --no-cache git ca-certificates tzdata && update-ca-certificates
